@@ -1,0 +1,159 @@
+/*module AES_decrypt#(
+    parameter N=128,          // Kích thước khối dữ liệu (128-bit)
+    parameter Nr=10,          // Số vòng (10 vòng cho AES-128)
+    parameter nk=4            // Số phần tử trong khóa (4 phần tử cho AES-128)
+)(
+
+    input [N-1:0] in,        // Dữ liệu đầu vào (128-bit plaintext)
+    input [N-1:0] key,       // Khóa 128-bit
+    output [N-1:0] out       // Dữ liệu đầu ra (128-bit ciphertext)
+);
+
+    // Các tín hiệu cần thiết
+    wire [N-1:0] state [Nr:0];     // Trạng thái sau mỗi vòng
+    wire [N-1:0] round_key[Nr:0];
+	 wire [N-1:0] aisb;  // after sub bytes
+    wire [N-1:0] aisr;  // after shift rows
+	 // Khóa của mỗi vòng
+
+    // Sử dụng keyexpansion để tạo khóa cho các vòng
+    keyexpansion #(Nr, nk) ke (
+        .key(key), 
+        .round(Nr),          // Vòng Nr cho AddRoundKey ban đầu
+        .w_out(round_key[Nr])   // Khóa con cho vòng Nr
+    );
+
+    // Thực hiện AddRoundKey cho vòng 0
+    adroundkey addrk1 (
+        .data(in), 
+        .out(state[0]), 
+        .key(round_key[Nr])
+    );
+
+    // Các vòng mã hóa
+    genvar i;
+    generate
+        for (i = 1; i < Nr; i = i + 1) begin : round_loop
+            // Truyền khóa tương ứng từ module keyexpansion cho từng vòng
+            keyexpansion ke_round (
+                .key(key), 
+                .round(Nr - i),         // Truyền vòng hiện tại
+                .w_out(round_key[Nr - i])  // Khóa của vòng i
+            );
+            decryptround dr (
+                .in(state[i-1]), 
+                .key(round_key[Nr - i]), 
+                .out(state[i])
+            );
+        end
+		 // SubBytes, ShiftRows và AddRoundKey cho vòng cuối cùng
+
+    invshiftrows isr (
+        .in(state[Nr-1]), 
+        .shifted(aisr)
+    );
+	 
+	 inversesubbytes isb (
+        .data_in(aisr), 
+        .data_out(aisb)
+	 );
+    keyexpansion ke_last (
+        .key(key), 
+        .round(0),       // Vòng cuối cùng
+        .w_out(round_key[0]) // Khóa của vòng cuối
+    );
+    adroundkey addrk2 (
+        .data(aisb), 
+        .out(state[Nr]), 
+        .key(round_key[0])
+    );
+
+    // Gán kết quả cuối cùng
+    assign out = state[Nr]; 
+    endgenerate
+
+endmodule
+*/
+
+module AES_decrypt #(
+    parameter N = 128,        // Kích thước khối dữ liệu (128-bit)
+    parameter Nr = 14,        // Số vòng (14 vòng cho AES-256) ✅
+    parameter nk = 8          // Số phần tử trong khóa (8 phần tử cho AES-256) ✅
+)(
+    input [N-1:0] in,         // Dữ liệu đầu vào (128-bit ciphertext)
+    input [255:0] key,        // Khóa 256-bit ✅ (Đã sửa từ 128-bit)
+    output [N-1:0] out        // Dữ liệu đầu ra (128-bit plaintext)
+);
+
+    // Các tín hiệu cần thiết
+    wire [N-1:0] state [Nr:0];     // Trạng thái sau mỗi vòng
+    wire [N-1:0] round_key[Nr:0];  // Khóa của mỗi vòng
+    wire [N-1:0] aisb;             // after inverse sub bytes
+    wire [N-1:0] aisr;             // after inverse shift rows
+
+    // ✅ Sử dụng keyexpansion cho AES-256 để tạo khóa vòng đầu tiên
+    keyexpansion #(.Nr(Nr), .nk(nk)) ke_initial (
+        .key(key), 
+        .round(Nr),              // Vòng Nr (14) cho AddRoundKey ban đầu
+        .w_out(round_key[Nr])    // Khóa con cho vòng Nr
+    );
+
+    // ✅ Thực hiện AddRoundKey ban đầu (với khóa vòng 14)
+    adroundkey addrk_initial (
+        .data(in), 
+        .out(state[0]), 
+        .key(round_key[Nr])
+    );
+
+    // ✅ Các vòng decrypt (từ vòng 1 đến vòng 13)
+    genvar i;
+    generate
+        for (i = 1; i < Nr; i = i + 1) begin : round_loop
+            // Tạo khóa cho vòng hiện tại
+            keyexpansion #(.Nr(Nr), .nk(nk)) ke_round (
+                .key(key), 
+                .round(Nr - i),          // Vòng đảo ngược: 13, 12, 11, ..., 1
+                .w_out(round_key[Nr - i]) // Khóa của vòng tương ứng
+            );
+            
+            // Thực hiện decrypt round
+            decryptround dr (
+                .in(state[i-1]), 
+                .key(round_key[Nr - i]), 
+                .out(state[i])
+            );
+        end
+    endgenerate
+
+    // ✅ Vòng cuối cùng: InvShiftRows + InvSubBytes + AddRoundKey
+    
+    // Inverse ShiftRows
+    invshiftrows isr (
+        .in(state[Nr-1]), 
+        .shifted(aisr)
+    );
+    
+    // Inverse SubBytes
+    inversesubbytes isb (
+        .data_in(aisr), 
+        .data_out(aisb)
+    );
+    
+    // Tạo khóa cho vòng cuối (vòng 0)
+    keyexpansion #(.Nr(Nr), .nk(nk)) ke_final (
+        .key(key), 
+        .round(0),               // Vòng 0 (khóa gốc)
+        .w_out(round_key[0])     // Khóa của vòng cuối
+    );
+    
+    // AddRoundKey cuối cùng
+    adroundkey addrk_final (
+        .data(aisb), 
+        .out(state[Nr]), 
+        .key(round_key[0])
+    );
+
+    // ✅ Gán kết quả cuối cùng
+    assign out = state[Nr];
+
+endmodule

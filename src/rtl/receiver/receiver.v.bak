@@ -1,0 +1,117 @@
+module receiver #(
+  parameter N = 128,        // AES block size
+  parameter Nr = 14,        // Number of rounds (14 for AES-256)
+  parameter nk = 8          // Key words (8 for AES-256)
+)(
+  input  wire         clk,
+  input  wire         rstn,
+  input  wire         start,
+  input  wire [31:0]  id,           
+  input  wire [255:0] key,          
+  input  wire [7:0]   ciphertext,   // Nhận ciphertext thay vì plaintext
+  input  wire         valid,        
+  input  wire         last,         
+  input  wire [255:0] received_hash, // Hash nhận được từ sender
+  output wire         done,         
+  output wire         hash_match,   // Kiểm tra hash có khớp không
+  output wire [63:0]  dec_sample,   // Sample của decrypted data
+  output wire [63:0]  hash_sample   // Sample của computed hash
+);
+
+// Internal signals
+wire [255:0] computed_hash;      
+wire [N-1:0] full_decrypted;     // ✅ Sử dụng parameter N
+reg  [N-1:0] aes_buffer;         // ✅ Sử dụng parameter N cho ciphertext buffer
+reg  [3:0]   byte_count;     
+reg          aes_data_ready;
+reg          processing;
+
+// Decrypted data buffer để hash
+reg  [N-1:0] decrypted_buffer;   // Buffer lưu decrypted data
+reg  [3:0]   dec_byte_count;
+reg          dec_valid;
+wire [7:0]   dec_byte_out;       // Byte output từ decrypted data
+
+// AES ciphertext collection logic
+always @(posedge clk or negedge rstn) begin
+  if (~rstn) begin
+      aes_buffer <= {N{1'b0}};     // ✅ Dynamic width
+      byte_count <= 4'b0;
+      aes_data_ready <= 1'b0;
+      processing <= 1'b0;
+  end else if (start) begin
+      byte_count <= 4'b0;
+      aes_data_ready <= 1'b0;
+      processing <= 1'b1;
+      aes_buffer <= {N{1'b0}};     // ✅ Dynamic width
+  end else if (processing && valid) begin
+      if (byte_count < (N/8 - 1)) begin      // ✅ Dynamic byte count
+          aes_buffer <= {aes_buffer[N-9:0], ciphertext};
+          byte_count <= byte_count + 1;
+      end else if (byte_count == (N/8 - 1)) begin
+          aes_buffer <= {aes_buffer[N-9:0], ciphertext};
+          aes_data_ready <= 1'b1;
+      end
+  end
+end
+
+// ✅ AES Decrypt module với parameters được truyền từ receiver
+AES_decrypt #(
+  .N(N),                // ✅ Truyền parameter từ receiver
+  .Nr(Nr),              // ✅ Truyền parameter từ receiver
+  .nk(nk)               // ✅ Truyền parameter từ receiver
+) aes_decrypt_inst (
+  .in(aes_buffer),      // Ciphertext input
+  .key(key),            // Decryption key
+  .out(full_decrypted)  // Decrypted plaintext output
+);
+
+// Decrypted data processing để chuẩn bị cho SHA-256
+always @(posedge clk or negedge rstn) begin
+  if (~rstn) begin
+      decrypted_buffer <= {N{1'b0}};
+      dec_byte_count <= 4'b0;
+      dec_valid <= 1'b0;
+  end else if (aes_data_ready) begin
+      decrypted_buffer <= full_decrypted;
+      dec_byte_count <= 4'b0;
+      dec_valid <= 1'b1;
+  end else if (dec_valid && dec_byte_count < (N/8)) begin
+      dec_byte_count <= dec_byte_count + 1;
+      if (dec_byte_count == (N/8 - 1)) begin
+          dec_valid <= 1'b0;
+      end
+  end
+end
+
+// Extract byte từ decrypted data để feed vào SHA-256
+assign dec_byte_out = decrypted_buffer[N-1-8*dec_byte_count -: 8];
+
+// SHA-256 module để hash decrypted data
+wire sha_ready, sha_out_valid;
+wire [31:0] sha_out_id;
+wire [60:0] sha_out_len;
+
+sha256 sha_inst (
+  .rstn(rstn), 
+  .clk(clk), 
+  .ready(sha_ready),
+  .valid(dec_valid && (dec_byte_count < (N/8))), // Valid khi đang output bytes
+  .last(dec_valid && (dec_byte_count == (N/8 - 1))), // Last byte
+  .id(id), 
+  .data(dec_byte_out),
+  .out_valid(sha_out_valid), 
+  .out_id(sha_out_id), 
+  .out_len(sha_out_len), 
+  .out_hash(computed_hash)
+);
+
+// Hash comparison logic
+assign hash_match = (computed_hash == received_hash) && sha_out_valid;
+
+// Output assignments
+assign done = sha_out_valid && aes_data_ready;
+assign dec_sample = full_decrypted[N-1:N-64];   // ✅ Dynamic bit selection cho decrypted sample
+assign hash_sample = computed_hash[255:192];    // Sample của computed hash
+
+endmodule
