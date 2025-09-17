@@ -1,0 +1,114 @@
+//===========================================================================================================
+// PARALLEL CRYPTO SENDER - SIMPLE VERSION
+//===========================================================================================================
+
+module parallel_crypto_sender(
+    input  wire         clk,
+    input  wire         rstn,
+    
+    // Control signals
+    input  wire         start,
+    
+    // Input data stream
+    input  wire [31:0]  id,
+    input  wire [255:0] key,
+    input  wire [7:0]   data,
+    input  wire         valid,
+    input  wire         last,
+    
+    // Output results
+    output wire         done,
+    output wire [255:0] hash,
+    output wire [127:0] encrypted
+);
+
+//===========================================================================================================
+// INTERNAL SIGNALS
+//===========================================================================================================
+
+// AES data collection
+reg  [127:0] aes_buffer;
+reg  [3:0]   byte_count;
+reg          aes_data_ready;
+
+// Control signals
+reg          processing;
+
+//===========================================================================================================
+// AES DATA COLLECTION - Thu thập 16 bytes đầu cho AES
+//===========================================================================================================
+
+always @(posedge clk or negedge rstn) begin
+    if (~rstn) begin
+        aes_buffer <= 128'b0;
+        byte_count <= 4'b0;
+        aes_data_ready <= 1'b0;
+        processing <= 1'b0;
+    end else if (start) begin
+        // Reset khi bắt đầu
+        byte_count <= 4'b0;
+        aes_data_ready <= 1'b0;
+        processing <= 1'b1;
+    end else if (processing && valid) begin
+        if (byte_count < 4'd15) begin
+            // Thu thập 16 bytes đầu tiên
+            aes_buffer <= {aes_buffer[119:0], data};
+            byte_count <= byte_count + 1;
+        end else if (byte_count == 4'd15) begin
+            // Byte thứ 16 - hoàn thành AES buffer
+            aes_buffer <= {aes_buffer[119:0], data};
+            aes_data_ready <= 1'b1;
+        end
+        // Sau khi có đủ 16 bytes, vẫn tiếp tục processing để SHA-256 hoàn thành
+    end
+end
+
+//===========================================================================================================
+// SHA-256 MODULE - Xử lý toàn bộ data stream
+//===========================================================================================================
+
+wire sha_ready;
+wire sha_out_valid;
+wire [31:0] sha_out_id;
+wire [60:0] sha_out_len;
+
+sha256 sha_inst (
+    .rstn(rstn),
+    .clk(clk),
+    
+    // Input interface
+    .ready(sha_ready),
+    .valid(processing && valid),  // Chỉ valid khi đang processing
+    .last(last),
+    .id(id),
+    .data(data),
+    
+    // Output interface
+    .out_valid(sha_out_valid),
+    .out_id(sha_out_id),
+    .out_len(sha_out_len),
+    .out_hash(hash)
+);
+
+//===========================================================================================================
+// AES ENCRYPT MODULE - Mã hóa 16 bytes đầu
+//===========================================================================================================
+
+AES_encrypt #(
+    .N(128),    // 128-bit block
+    .Nr(14),    // 14 rounds for AES-256
+    .nk(8)      // 8 key words (256-bit key)
+) aes_inst (
+    .in(aes_buffer),
+    .key(key),
+    .out(encrypted)
+);
+
+//===========================================================================================================
+// OUTPUT CONTROL
+//===========================================================================================================
+
+// Done khi cả SHA-256 và AES đều hoàn thành
+assign done = sha_out_valid && aes_data_ready;
+
+endmodule
