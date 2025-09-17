@@ -1,0 +1,369 @@
+module tb_receiver;
+
+//===========================================================================================================
+// TESTBENCH PARAMETERS
+//===========================================================================================================
+
+parameter MAX_DATA_SIZE = 1024;  // Maximum number of bytes to read
+parameter TIMEOUT_CYCLES = 50000; // Timeout limit
+parameter MAX_LINE_LENGTH = 256;  // Maximum characters per line
+
+//===========================================================================================================
+// TESTBENCH SIGNALS
+//===========================================================================================================
+
+reg         clk, rstn, start;
+reg  [31:0] id;
+reg  [255:0] key;
+reg  [7:0]  ciphertext;        
+reg         valid, last;
+
+wire        done;
+wire [63:0] dec_sample;        
+wire [63:0] hash_sample;       
+
+// File handling
+reg  [7:0]  input_data [0:MAX_DATA_SIZE-1]; // Input ciphertext array
+reg  [31:0] data_length;                    // Actual data length
+reg  [31:0] data_index;                     // Current data index
+reg  [31:0] cycle_count;                    // Cycle counter
+reg         timeout_flag;                   // Timeout flag
+reg         file_read_done;                 // File read completion flag
+
+// String processing
+reg  [7:0]  temp_string [0:MAX_LINE_LENGTH-1]; // Temporary string buffer
+reg  [31:0] string_length;                     // Length of current string
+
+// Expected results (for comparison if available)
+reg  [63:0] expected_hash_sample;
+reg  [63:0] expected_dec_sample;
+reg         has_expected_results;
+
+//===========================================================================================================
+// DUT INSTANTIATION
+//===========================================================================================================
+
+receiver dut (
+  .clk(clk),
+  .rstn(rstn),
+  .start(start),
+  .id(id),
+  .key(key),
+  .ciphertext(ciphertext),     
+  .valid(valid),
+  .last(last),
+  .done(done),
+  .dec_sample(dec_sample),     
+  .hash_sample(hash_sample)
+);
+
+//===========================================================================================================
+// CLOCK GENERATION
+//===========================================================================================================
+
+initial begin
+  clk = 0;
+  forever #5 clk = ~clk;  // 100MHz clock
+end
+
+//===========================================================================================================
+// TIMEOUT COUNTER
+//===========================================================================================================
+
+always @(posedge clk or negedge rstn) begin
+  if (~rstn) begin
+      cycle_count <= 32'b0;
+      timeout_flag <= 1'b0;
+  end else begin
+      cycle_count <= cycle_count + 1;
+      if (cycle_count > TIMEOUT_CYCLES) begin
+          timeout_flag <= 1'b1;
+      end
+  end
+end
+
+//===========================================================================================================
+// FILE READING TASKS - CIPHERTEXT FILES
+//===========================================================================================================
+
+task read_ciphertext_file;
+  input [1023:0] filename;  // File path string
+  integer file_handle;
+  integer i, temp_data;
+  integer read_result;
+  begin
+      $display("=== Reading CIPHERTEXT file: %s ===", filename);
+      
+      file_handle = $fopen(filename, "r");
+      if (file_handle == 0) begin
+          $display("ERROR: Cannot open ciphertext file %s", filename);
+          $finish;
+      end
+      
+      data_length = 0;
+      i = 0;
+      
+      // Read ciphertext byte by byte (hex format)
+      while (!$feof(file_handle) && i < MAX_DATA_SIZE) begin
+          read_result = $fscanf(file_handle, "%h", temp_data);
+          if (read_result == 1) begin
+              input_data[i] = temp_data[7:0];
+              i = i + 1;
+          end
+      end
+      
+      data_length = i;
+      $fclose(file_handle);
+      
+      $display("Read %0d bytes of ciphertext", data_length);
+      
+      // Display first few bytes
+      $write("Ciphertext (first 16 bytes): ");
+      for (i = 0; i < data_length && i < 16; i = i + 1) begin
+          $write("%02h ", input_data[i]);
+      end
+      if (data_length > 16) $write("...");
+      $display("");
+      
+      file_read_done = 1;
+  end
+endtask
+
+task read_expected_results_file;
+  input [1023:0] filename;  // File path string
+  integer file_handle;
+  integer read_result;
+  begin
+      $display("=== Reading EXPECTED RESULTS file: %s ===", filename);
+      
+      file_handle = $fopen(filename, "r");
+      if (file_handle == 0) begin
+          $display("WARNING: Cannot open expected results file %s", filename);
+          has_expected_results = 0;
+          return;
+      end
+      
+      // Read expected hash sample (64-bit)
+      read_result = $fscanf(file_handle, "%h", expected_hash_sample);
+      if (read_result != 1) begin
+          $display("WARNING: Failed to read expected hash sample");
+          has_expected_results = 0;
+          $fclose(file_handle);
+          return;
+      end
+      
+      // Read expected dec sample (64-bit)  
+      read_result = $fscanf(file_handle, "%h", expected_dec_sample);
+      if (read_result != 1) begin
+          $display("WARNING: Failed to read expected dec sample");
+          has_expected_results = 0;
+          $fclose(file_handle);
+          return;
+      end
+      
+      $fclose(file_handle);
+      has_expected_results = 1;
+      
+      $display("Expected Hash Sample: %016h", expected_hash_sample);
+      $display("Expected Dec Sample:  %016h", expected_dec_sample);
+  end
+endtask
+
+//===========================================================================================================
+// RESULT WRITING TASK
+//===========================================================================================================
+
+task write_results_file;
+  input [1023:0] filename;
+  integer file_handle;
+  integer i;
+  reg write_success;
+  begin
+      $display("=== Writing results to file: %s ===", filename);
+      
+      file_handle = $fopen(filename, "w");
+      write_success = 0;
+      
+      if (file_handle == 0) begin
+          $display("ERROR: Cannot create output file %s", filename);
+          write_success = 0;
+      end else begin
+          // Write input summary
+          $fwrite(file_handle, "=== RECEIVER INPUT SUMMARY ===\n");
+          $fwrite(file_handle, "ID: %08h\n", id);
+          $fwrite(file_handle, "Key: %064h\n", key);
+          $fwrite(file_handle, "Ciphertext Length: %0d bytes\n", data_length);
+          $fwrite(file_handle, "Input Ciphertext (hex): ");
+          for (i = 0; i < data_length && i < 32; i = i + 1) begin
+              $fwrite(file_handle, "%02h ", input_data[i]);
+          end
+          if (data_length > 32) $fwrite(file_handle, "...");
+          $fwrite(file_handle, "\n\n");
+          
+          // Write results
+          $fwrite(file_handle, "=== DECRYPTION & HASH RESULTS ===\n");
+          $fwrite(file_handle, "Processing Status: %s\n", done ? "COMPLETED" : "IN PROGRESS");
+          $fwrite(file_handle, "Hash Sample:      %016h\n", hash_sample);
+          $fwrite(file_handle, "Dec Sample:       %016h\n", dec_sample);
+          $fwrite(file_handle, "Cycle Count:      %08d\n", cycle_count);
+          
+          // Write comparison if expected results available
+          if (has_expected_results) begin
+              $fwrite(file_handle, "\n=== COMPARISON WITH EXPECTED ===\n");
+              $fwrite(file_handle, "Hash Sample Match: %s\n", 
+                      (hash_sample == expected_hash_sample) ? "PASS" : "FAIL");
+              $fwrite(file_handle, "Dec Sample Match:  %s\n", 
+                      (dec_sample == expected_dec_sample) ? "PASS" : "FAIL");
+              $fwrite(file_handle, "Expected Hash:     %016h\n", expected_hash_sample);
+              $fwrite(file_handle, "Expected Dec:      %016h\n", expected_dec_sample);
+          end
+          
+          $fclose(file_handle);
+          write_success = 1;
+      end
+      
+      if (write_success) begin
+          $display("Results written successfully");
+      end else begin
+          $display("Failed to write results");
+      end
+  end
+endtask
+
+//===========================================================================================================
+// DATA TRANSMISSION TASK
+//===========================================================================================================
+
+task send_ciphertext_stream;
+  integer i;
+  begin
+      $display("=== Sending ciphertext stream (%0d bytes) ===", data_length);
+      
+      for (i = 0; i < data_length; i = i + 1) begin
+          @(posedge clk);
+          ciphertext = input_data[i];
+          valid = 1;
+          last = (i == data_length - 1) ? 1 : 0;
+          
+          // Show progress every 16 bytes or at the end
+          if (i % 16 == 0 || i == data_length - 1) begin
+              $display("  Cipher[%0d] = 0x%02h %s", 
+                       i, ciphertext, last ? "(LAST)" : "");
+          end
+      end
+      
+      @(posedge clk);
+      valid = 0;
+      last = 0;
+      
+      $display("Ciphertext transmission completed");
+  end
+endtask
+
+//===========================================================================================================
+// MAIN TEST SEQUENCE
+//===========================================================================================================
+
+initial begin
+  $display("=== RECEIVER TESTBENCH STARTED ===");
+  
+  // Initialize signals
+  rstn = 0;
+  start = 0;
+  valid = 0;
+  last = 0;
+  ciphertext = 8'h00;
+  data_index = 0;
+  file_read_done = 0;
+  timeout_flag = 0;
+  has_expected_results = 0;
+  
+  // Test configuration - SAME KEY AS SENDER
+  id = 32'hABCD1234;
+  key = 256'h603DEB1015CA71BE2B73AEF0857D77811F352C073B6108D72D9810A30914DFF4;
+  
+  // Reset sequence
+  #20;
+  rstn = 1;
+  $display("Reset completed");
+  
+  // Read input files
+  read_ciphertext_file("D:/HK242/DATN/Hardware/receiver/ciphertext.txt");
+  
+  // Optionally read expected results for comparison
+  read_expected_results_file("D:/HK242/DATN/Hardware/receiver/expected.txt");
+  
+  if (!file_read_done || data_length == 0) begin
+      $display("ERROR: File reading failed or empty file");
+      $finish;
+  end
+  
+  // Start processing
+  #10;
+  start = 1;
+  #10;
+  start = 0;
+  $display("Decryption & hash calculation started");
+  
+  // Send ciphertext
+  send_ciphertext_stream();
+  
+  // Wait for completion
+  $display("Waiting for processing completion...");
+  while (~done && ~timeout_flag) begin
+      @(posedge clk);
+      if (cycle_count % 1000 == 0) begin
+          $display("  Waiting... cycle %0d", cycle_count);
+      end
+  end
+  
+  // Check results
+  if (done) begin
+      $display("=== PROCESSING COMPLETED! ===");
+      $display("Input: %0d bytes ciphertext", data_length);
+      $display("Hash Sample:  0x%016h", hash_sample);
+      $display("Dec Sample:   0x%016h", dec_sample);
+      $display("Total Cycles: %0d", cycle_count);
+      
+      // Compare with expected results if available
+      if (has_expected_results) begin
+          $display("\n=== COMPARISON WITH EXPECTED ===");
+          if (hash_sample == expected_hash_sample) begin
+              $display("✅ Hash Sample: MATCH");
+          end else begin
+              $display("❌ Hash Sample: MISMATCH");
+              $display("   Expected: 0x%016h", expected_hash_sample);
+              $display("   Got:      0x%016h", hash_sample);
+          end
+          
+          if (dec_sample == expected_dec_sample) begin
+              $display("✅ Dec Sample: MATCH");
+          end else begin
+              $display("❌ Dec Sample: MISMATCH");
+              $display("   Expected: 0x%016h", expected_dec_sample);
+              $display("   Got:      0x%016h", dec_sample);
+          end
+      end
+      
+      // Write detailed results
+      write_results_file("D:/HK242/DATN/Hardware/receiver/output.txt");
+      
+  end else if (timeout_flag) begin
+      $display("ERROR: Timeout occurred after %0d cycles", cycle_count);
+  end
+  
+  #100;
+  $display("=== RECEIVER TESTBENCH COMPLETED ===");
+  $finish;
+end
+
+//===========================================================================================================
+// WAVEFORM DUMP
+//===========================================================================================================
+
+initial begin
+  $dumpfile("receiver_simulation.vcd");
+  $dumpvars(0, tb_receiver);
+end
+
+endmodule

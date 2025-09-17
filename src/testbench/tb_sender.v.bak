@@ -1,0 +1,139 @@
+`timescale 1ns/1ps
+
+module tb_sender;
+
+//===========================================================================================================
+// TESTBENCH SIGNALS
+//===========================================================================================================
+
+reg         clk;
+reg         rstn;
+reg         start;
+reg  [31:0] id;
+reg  [255:0] key;
+reg  [7:0]  data;
+reg         valid;
+reg         last;
+
+wire        done;
+wire [255:0] hash;
+wire [127:0] encrypted;
+
+//===========================================================================================================
+// DUT INSTANTIATION
+//===========================================================================================================
+
+	 sender dut (
+    .clk(clk),
+    .rstn(rstn),
+    .start(start),
+    .id(id),
+    .key(key),
+    .data(data),
+    .valid(valid),
+    .last(last),
+    .done(done),
+    .hash(hash),
+    .encrypted(encrypted)
+);
+
+//===========================================================================================================
+// CLOCK GENERATION
+//===========================================================================================================
+
+initial begin
+    clk = 0;
+    forever #5 clk = ~clk;  // 100MHz clock
+end
+
+//===========================================================================================================
+// TEST STIMULUS
+//===========================================================================================================
+
+// Test data
+reg [7:0] test_message [0:31];  // 32 bytes test message
+
+initial begin
+    // Initialize test message
+    test_message[0]  = 8'h48; test_message[1]  = 8'h65; test_message[2]  = 8'h6C; test_message[3]  = 8'h6C;  // "Hell"
+    test_message[4]  = 8'h6F; test_message[5]  = 8'h20; test_message[6]  = 8'h57; test_message[7]  = 8'h6F;  // "o Wo"
+    test_message[8]  = 8'h72; test_message[9]  = 8'h6C; test_message[10] = 8'h64; test_message[11] = 8'h21;  // "rld!"
+    test_message[12] = 8'h20; test_message[13] = 8'h54; test_message[14] = 8'h68; test_message[15] = 8'h69;  // " Thi"
+    test_message[16] = 8'h73; test_message[17] = 8'h20; test_message[18] = 8'h69; test_message[19] = 8'h73;  // "s is"
+    test_message[20] = 8'h20; test_message[21] = 8'h61; test_message[22] = 8'h20; test_message[23] = 8'h74;  // " a t"
+    test_message[24] = 8'h65; test_message[25] = 8'h73; test_message[26] = 8'h74; test_message[27] = 8'h21;  // "est!"
+    test_message[28] = 8'h21; test_message[29] = 8'h21; test_message[30] = 8'h21; test_message[31] = 8'h21;  // "!!!!"
+end
+
+integer i;
+
+initial begin
+    // Initialize signals
+    rstn = 0;
+    start = 0;
+    valid = 0;
+    last = 0;
+    id = 32'h12345678;
+    key = 256'hDEADBEEFCAFEBABE0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF;
+    data = 8'h00;
+    
+    $display("=== PARALLEL CRYPTO SENDER TEST ===");
+    
+    // Reset
+    #20 rstn = 1;
+    $display("Time %0t: Reset released", $time);
+    
+    // Start processing
+    #10 start = 1;
+    $display("Time %0t: Start signal asserted", $time);
+    #10 start = 0;
+    
+    // Send test message (32 bytes)
+    $display("Time %0t: Sending 32-byte message...", $time);
+    for (i = 0; i < 32; i = i + 1) begin
+        @(posedge clk);
+        data = test_message[i];
+        valid = 1;
+        last = (i == 31);  // Last byte
+        $display("Time %0t: Byte[%0d] = 0x%02h", $time, i, data);
+    end
+    
+    @(posedge clk);
+    valid = 0;
+    last = 0;
+    $display("Time %0t: Data transmission completed", $time);
+    
+    // Wait for completion
+    $display("Time %0t: Waiting for processing completion...", $time);
+    wait(done);
+    
+    // Display results
+    $display("\n=== RESULTS ===");
+    $display("Time %0t: Processing completed!", $time);
+    $display("SHA-256 Hash: %064h", hash);
+    $display("AES Encrypted (first 16 bytes): %032h", encrypted);
+    
+    // Verify first 16 bytes were encrypted
+    $display("\nFirst 16 bytes of message: %032h", 
+             {test_message[0], test_message[1], test_message[2], test_message[3],
+              test_message[4], test_message[5], test_message[6], test_message[7],
+              test_message[8], test_message[9], test_message[10], test_message[11],
+              test_message[12], test_message[13], test_message[14], test_message[15]});
+    
+    #100;
+    $display("=== TEST COMPLETED ===");
+    $finish;
+end
+
+//===========================================================================================================
+// MONITORING
+//===========================================================================================================
+
+// Monitor important signals
+always @(posedge clk) begin
+    if (done) begin
+        $display("*** CRYPTO PROCESSING DONE ***");
+    end
+end
+
+endmodule
