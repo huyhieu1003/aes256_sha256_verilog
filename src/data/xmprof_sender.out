@@ -1,0 +1,59 @@
+xmsim(64): 20.09-s001: (c) Copyright 1995-2020 Cadence Design Systems, Inc.
+
+Linux centos7 3.10.0-1160.108.1.el7.x86_64 #1 SMP Thu Jan 25 16:17:31 UTC 2024 x86_64 2 CPUs, 7800 Meg RAM, 500 hits/sec, (admin)
+
+	model name:Intel(R) Core(TM) i5-10300H CPU @ 2.50GHz
+ 
+	cache size:8192 KB
+ 
+xmelab options:
+	-CDSLIB
+	./xcelium.d/run.lnx8664.20.09.d/cds.lib
+	-HDLVAR
+	./xcelium.d/run.lnx8664.20.09.d/hdl.var
+	-WORK
+	worklib
+	-ENABLE_SVMEMOPT
+	-TIMESCALE
+	1ns/1ps
+	-MESSAGES
+	-ACCESS
+	+rwc
+	worklib.tb_sender:v
+
+Profiled Intervals: 
+                #start                  #stop             #start_CPU          #stop_CPU               #CPS
+[1]               0 NS   to           1505 NS                 0.9558             1.0229         22425.5338
+
+Memory Usage - 46.5M program + 268.3M data + 2.0M profile = 316.8M total
+CPU Usage - 0.7s system + 0.5s user = 1.3s total (91.9% cpu)
+
+License Acquisition Time - 0.1s
+Snapshot Loading: CPU Usage - 0.5s system + 0.4s user = 0.9s total (1.2s, 78.4% cpu)
+
+------------------------------------------------------------
+Stream Counts (31 hits total)
+------------------------------------------------------------
+%hits #hits  #inst  name
+ 80.6    25 [     ] VCD Waveform Dump
+ 16.1     5 [     ] VCD Waveform Dump Setup
+  3.2     1 [     ] outside engine
+
+------------------------------------------------------------
+Most Active Modules (behavioral)
+------------------------------------------------------------
+%hits #hits  #inst  name
+------------------------------------------------------------
+Stream Type Summary Counts (31 hits total)
+------------------------------------------------------------
+%hits #hits  #inst  name
+ 96.8    30 [     ] Waveform Dump 
+  3.2     1 [     ] Outside engine 
+
+------------------------------------------------------------
+Technology-wise Summary Counts (31 hits total)
+------------------------------------------------------------
+%hits #hits  name
+ 96.8    30 Analysis 
+  3.2     1 Miscellaneous 
+

@@ -1,0 +1,70 @@
+========================================
+  RECEIVER HASH VERIFICATION RESULTS
+========================================
+Test Time: 1835000 ns
+Status: SUCCESS
+
+--- INPUT DATA ---
+ID:             0xabcd1234
+Key:            0x603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+Ciphertext:     0x2b789d84fa3483d7f5fe44d5a8ea2b66
+Expected Hash:  0x761983a48ab6a817ba2883c304ebd187743c0d1e9da97ed0d7ca7f82a611ddd6
+
+--- PROCESSING RESULTS ---
+Processing Status: COMPLETED
+Dec Sample:       0x4772616475617469
+Hash Sample:      0x761983a48ab6a817
+Full Plaintext:   0x47726164756174696f6e2050726f6a21
+Computed Hash:    0x761983a48ab6a817ba2883c304ebd187743c0d1e9da97ed0d7ca7f82a611ddd6
+
+--- HASH VERIFICATION ---
+Expected SHA Input: 0xabcd123447726164756174696f6e2050726f6a21
+Actual SHA Input:   0xabcd123447726164756174696f6e2050726f6a21
+SHA Input Match:    YES
+Expected Hash:      0x761983a48ab6a817ba2883c304ebd187743c0d1e9da97ed0d7ca7f82a611ddd6
+Computed Hash:      0x761983a48ab6a817ba2883c304ebd187743c0d1e9da97ed0d7ca7f82a611ddd6
+Hash Match (Internal): YES
+Hash Match (Manual):   YES
+Verification Done:     YES
+
+âœ… HASH MATCH: All 256 bits identical
+
+--- ASCII CONVERSION ---
+ASCII Text:       'Graduation Proj!'
+Hex String:       61 74 69 6f 6e 20 50 72 6f 6a 21
+
+--- BYTE-BY-BYTE ANALYSIS ---
+Byte  0: 0x47 = 'G' (printable)
+Byte  1: 0x72 = 'r' (printable)
+Byte  2: 0x61 = 'a' (printable)
+Byte  3: 0x64 = 'd' (printable)
+Byte  4: 0x75 = 'u' (printable)
+Byte  5: 0x61 = 'a' (printable)
+Byte  6: 0x74 = 't' (printable)
+Byte  7: 0x69 = 'i' (printable)
+Byte  8: 0x6f = 'o' (printable)
+Byte  9: 0x6e = 'n' (printable)
+Byte 10: 0x20 = ' ' (printable)
+Byte 11: 0x50 = 'P' (printable)
+Byte 12: 0x72 = 'r' (printable)
+Byte 13: 0x6f = 'o' (printable)
+Byte 14: 0x6a = 'j' (printable)
+Byte 15: 0x21 = '!' (printable)
+
+--- VERIFICATION SUMMARY ---
+Decryption:       SUCCESS
+SHA Input:          CORRECT
+Dec Sample:         CORRECT
+Hash Sample:        CORRECT
+Hash Verification: PASSED
+ASCII Readable:   YES
+Overall Result:   ÿÿ… PASS
+
+--- FINAL STATUS ---
+ðŸŽ‰ TEST PASSED: All verifications successful
+   - Decryption completed successfully
+   - Hash computation correct
+   - Hash verification passed
+   - All samples match expected values
+
+========================================

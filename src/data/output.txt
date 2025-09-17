@@ -1,0 +1,38 @@
+=====================================
+   SENDER MODULE TEST RESULTS        
+   ✅ FIXED VERSION - MANUAL ID+DATA 
+=====================================
+
+=== CONFIGURATION ===
+ID:  0xabcd1234
+Key: 0x603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+Data length: 16 bytes
+
+=== PROCESSING INFO ===
+Status:      COMPLETED
+Processing cycles: 139
+Processing time: 1.39 us (@ 100MHz)
+SHA-256 processes: ID + Data = 20 bytes
+AES-256 processes: First 16 bytes of data
+
+=== EXPECTED INPUTS (for manual verification) ===
+SHA-256 Expected Input Sequence:
+  ID bytes (big-endian): ab cd 12 34
+  Data bytes: 47 72 61 64 75 61 74 69 6f 6e 20 50 72 6f 6a 21 
+  Combined hex for manual SHA-256: abcd123447726164756174696f6e2050726f6a21
+
+AES-256 Expected Input (first 16 bytes):
+  47 72 61 64 75 61 74 69 6f 6e 20 50 72 6f 6a 21 
+
+=== I/O OUTPUTS (64-bit samples) ===
+SHA-256 Hash Sample:  0x761983a48ab6a817
+AES-256 Enc Sample:   0x2b789d84fa3483d7
+
+=== INTERNAL FULL OUTPUTS ===
+Full SHA-256 Hash (256-bit):
+0x761983a48ab6a817ba2883c304ebd187743c0d1e9da97ed0d7ca7f82a611ddd6
+
+Full AES-256 Encrypted (128-bit):
+0x2b789d84fa3483d7f5fe44d5a8ea2b66
+
+=====================================

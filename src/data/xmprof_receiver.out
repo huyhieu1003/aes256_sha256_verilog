@@ -1,0 +1,59 @@
+xmsim(64): 20.09-s001: (c) Copyright 1995-2020 Cadence Design Systems, Inc.
+
+Linux centos7 3.10.0-1160.108.1.el7.x86_64 #1 SMP Thu Jan 25 16:17:31 UTC 2024 x86_64 2 CPUs, 7800 Meg RAM, 500 hits/sec, (admin)
+
+	model name:Intel(R) Core(TM) i5-10300H CPU @ 2.50GHz
+ 
+	cache size:8192 KB
+ 
+xmelab options:
+	-CDSLIB
+	./xcelium.d/run.lnx8664.20.09.d/cds.lib
+	-HDLVAR
+	./xcelium.d/run.lnx8664.20.09.d/hdl.var
+	-WORK
+	worklib
+	-ENABLE_SVMEMOPT
+	-TIMESCALE
+	1ns/1ps
+	-MESSAGES
+	-ACCESS
+	+rwc
+	worklib.tb_receiver:v
+
+Profiled Intervals: 
+                #start                  #stop             #start_CPU          #stop_CPU               #CPS
+[1]               0 NS   to           1925 NS                 0.7577             0.7640        303006.4536
+
+Memory Usage - 46.5M program + 263.6M data + 2.0M profile = 312.1M total
+CPU Usage - 0.1s system + 0.8s user = 0.9s total (86.5% cpu)
+
+License Acquisition Time - 0.1s
+Snapshot Loading: CPU Usage - 0.1s system + 0.6s user = 0.8s total (1.1s, 68.1% cpu)
+
+------------------------------------------------------------
+Stream Counts (2 hits total)
+------------------------------------------------------------
+%hits #hits  #inst  name
+ 50.0     1 [   14] Initial stmt (file: ./inversesubbytes.v, line: 12 in worklib.inversesubbytes [module])
+ 50.0     1 [     ] ftio_functions
+
+------------------------------------------------------------
+Most Active Modules (behavioral)
+------------------------------------------------------------
+%hits #hits  #inst  name
+ 50.0     1 [   14] worklib.inversesubbytes:v (file: ./inversesubbytes.v line: 1)
+------------------------------------------------------------
+Stream Type Summary Counts (2 hits total)
+------------------------------------------------------------
+%hits #hits  #inst  name
+ 50.0     1 [   54] Initial statements 
+ 50.0     1 [     ] File IO  
+
+------------------------------------------------------------
+Technology-wise Summary Counts (2 hits total)
+------------------------------------------------------------
+%hits #hits  name
+ 50.0     1 TB/SV 
+ 50.0     1 RTL/Design 
+
